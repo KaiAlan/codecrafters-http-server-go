@@ -24,8 +24,6 @@ func ParsePathForEcho(path string) (bool, string, string) {
 
 	basePath, stringAfterEcho, echoPresent := strings.Cut(path, "echo/")
 
-	fmt.Println("BasePath: "+basePath+"\nResponse String "+stringAfterEcho+"\nEcho Present ? ", echoPresent)
-
 	return echoPresent, stringAfterEcho, basePath
 }
 
@@ -68,7 +66,7 @@ func main() {
 
 	method, path, _ := ParseRequest(request)
 
-	// httpResponse := "HTTP/1.1 200 OK\r\n\r\n"
+	httpResponse := "HTTP/1.1 200 OK\r\n\r\n"
 	defaultResponse := "HTTP/1.1 404 Not Found\r\n\r\n"
 	// echoPathResponse := "HTTP/1.1 200 OK\r\n\r\nContent-Type: text/plain\r\n\r\n"
 
@@ -76,7 +74,14 @@ func main() {
 
 		echoPresent, stringAfterEcho, _ := ParsePathForEcho(path)
 
-		if echoPresent {
+		if path == "/" {
+			_, err := conn.Write([]byte(httpResponse))
+
+			if err != nil {
+				fmt.Println("Error sending response: ", err.Error())
+				os.Exit(1)
+			}
+		} else if echoPresent {
 
 			contentLength := strconv.Itoa(len(stringAfterEcho))
 
