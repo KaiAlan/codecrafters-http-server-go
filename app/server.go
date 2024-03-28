@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strconv"
 	"strings"
 )
 
@@ -17,6 +18,15 @@ func ParseRequest(request string) (string, string, string) {
 	version := requestParams[2]
 
 	return method, path, version
+}
+
+func ParsePathForEcho(path string) (bool, string, string) {
+
+	basePath, stringAfterEcho, echoPresent := strings.Cut(path, "echo/")
+
+	fmt.Println("BasePath: "+basePath+"\nResponse String "+stringAfterEcho+"\nEcho Present ? ", echoPresent)
+
+	return echoPresent, stringAfterEcho, basePath
 }
 
 func main() {
@@ -58,21 +68,31 @@ func main() {
 
 	method, path, _ := ParseRequest(request)
 
-	httpResponse := "HTTP/1.1 200 OK\r\n\r\n"
+	// httpResponse := "HTTP/1.1 200 OK\r\n\r\n"
 	defaultResponse := "HTTP/1.1 404 Not Found\r\n\r\n"
+	// echoPathResponse := "HTTP/1.1 200 OK\r\n\r\nContent-Type: text/plain\r\n\r\n"
 
 	if method == "GET" {
 
-		switch path {
-		case "/":
-			bytesSent, err := conn.Write([]byte(httpResponse))
+		echoPresent, stringAfterEcho, _ := ParsePathForEcho(path)
+
+		if echoPresent {
+
+			contentLength := strconv.Itoa(len(stringAfterEcho))
+
+			echoPathResponse := "HTTP/1.1 200 OK\r\n"
+			echoPathResponse += "Content-type: text/plain\r\n"
+			echoPathResponse += "Content-length: " + contentLength + "\r\n\r\n"
+			echoPathResponse += stringAfterEcho + "\r\n\r\n"
+
+			bytesSent, err := conn.Write([]byte(echoPathResponse))
 
 			if err != nil {
 				fmt.Println("Error sending response: ", err.Error())
 				os.Exit(1)
 			}
-			fmt.Printf("Sent %d bytes to client (expected: %d)\n", bytesSent, len(httpResponse))
-		default:
+			fmt.Printf("Sent %d bytes to client (expected: %d)\n", bytesSent, len(echoPathResponse))
+		} else {
 			_, err := conn.Write([]byte(defaultResponse))
 
 			if err != nil {
