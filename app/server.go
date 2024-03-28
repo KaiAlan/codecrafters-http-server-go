@@ -27,6 +27,15 @@ func ParsePathForEcho(path string) (bool, string, string) {
 	return echoPresent, stringAfterEcho, basePath
 }
 
+func setResponse(statusCode string, statusMessage string, contentType string, contentLength string, responseBody string) string {
+	response := "HTTP/1.1 " + statusCode + " " + statusMessage + "\r\n"
+	response += "Content-type: " + contentType + "\r\n"
+	response += "Content-length: " + contentLength + "\r\n\r\n"
+	response += responseBody + "\r\n"
+
+	return response
+}
+
 func main() {
 
 	fmt.Println("Logging...")
@@ -68,7 +77,6 @@ func main() {
 
 	httpResponse := "HTTP/1.1 200 OK\r\n\r\n"
 	defaultResponse := "HTTP/1.1 404 Not Found\r\n\r\n"
-	// echoPathResponse := "HTTP/1.1 200 OK\r\n\r\nContent-Type: text/plain\r\n\r\n"
 
 	if method == "GET" {
 
@@ -85,18 +93,31 @@ func main() {
 
 			contentLength := strconv.Itoa(len(stringAfterEcho))
 
-			echoPathResponse := "HTTP/1.1 200 OK\r\n"
-			echoPathResponse += "Content-type: text/plain\r\n"
-			echoPathResponse += "Content-length: " + contentLength + "\r\n\r\n"
-			echoPathResponse += stringAfterEcho + "\r\n\r\n"
+			response := setResponse("200", "OK", "text/plain", contentLength, stringAfterEcho)
 
-			bytesSent, err := conn.Write([]byte(echoPathResponse))
+			bytesSent, err := conn.Write([]byte(response))
 
 			if err != nil {
 				fmt.Println("Error sending response: ", err.Error())
 				os.Exit(1)
 			}
-			fmt.Printf("Sent %d bytes to client (expected: %d)\n", bytesSent, len(echoPathResponse))
+			fmt.Printf("Sent %d bytes to client (expected: %d)\n", bytesSent, len(response))
+		} else if path == "/user-agent" {
+
+			requestHeader := strings.Split(request, "\r\n")[2]
+
+			if strings.HasPrefix(requestHeader, "User-Agent") {
+
+				requestBody := requestHeader[12:]
+				response := setResponse("200", "OK", "text/plain", strconv.Itoa(len(requestBody)), requestBody)
+				bytesSent, err := conn.Write([]byte(response))
+
+				if err != nil {
+					fmt.Println("Error sending response: ", err.Error())
+					os.Exit(1)
+				}
+				fmt.Printf("Sent %d bytes to client (expected: %d)\n", bytesSent, len(response))
+			}
 		} else {
 			_, err := conn.Write([]byte(defaultResponse))
 
