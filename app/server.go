@@ -150,8 +150,27 @@ func handleConnection(conn net.Conn, filePath string) {
 				os.Exit(1)
 			}
 		}
+	} else if method == "POST" {
+
+		if strings.HasPrefix(path, "/files/") {
+			filename := strings.Split(path, "/files/")[1]
+			fullFilePath := filePath + "/" + filename
+			requestBody := strings.Split(request, "\r\n\r\n")[1]
+
+			err := os.WriteFile(fullFilePath, []byte(requestBody), 0666)
+
+			if err == nil {
+
+				fmt.Println("Writing to file: " + fullFilePath + " (Total content length: " + strconv.Itoa(len(requestBody)) + ")")
+
+				conn.Write([]byte("HTTP/1.1 201 OK\r\n\r\n"))
+			} else {
+				fmt.Println("Server Error: ", err.Error())
+				os.Exit(1)
+			}
+		}
 	} else {
-		fmt.Println("Not a GET request")
+		fmt.Println("Not a valid request")
 	}
 
 }
