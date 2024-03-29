@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"net"
 	"os"
@@ -43,6 +44,9 @@ func main() {
 
 	fmt.Println("Logging...")
 
+	filePath := flag.String("directory", "", "file path")
+	flag.Parse()
+
 	//binding to port
 	listner, err := net.Listen("tcp", "0.0.0.0:4221")
 	if err != nil {
@@ -62,12 +66,12 @@ func main() {
 
 		fmt.Println("Client connected: ", conn.RemoteAddr())
 
-		go handleConnection(conn)
+		go handleConnection(conn, *filePath)
 	}
 
 }
 
-func handleConnection(conn net.Conn) {
+func handleConnection(conn net.Conn, filePath string) {
 
 	defer conn.Close()
 
@@ -118,6 +122,26 @@ func handleConnection(conn net.Conn) {
 				response := setResponse("200", "OK", "text/plain", strconv.Itoa(len(requestBody)), requestBody)
 				sendResponse(response, conn)
 			}
+		} else if strings.HasPrefix(path, "/files") {
+
+			filename := strings.Split(path, "/files/")[1]
+			fullFilePath := filePath + "/" + filename
+
+			fileContent, err := os.ReadFile(fullFilePath)
+
+			if err != nil {
+				_, err := conn.Write([]byte(defaultResponse))
+
+				if err != nil {
+					fmt.Println("Error sending response: ", err.Error())
+					os.Exit(1)
+				}
+				os.Exit(1)
+			}
+
+			response := setResponse("200", "OK", "application/octet-stream", strconv.Itoa(len(fileContent)), string(fileContent))
+			sendResponse(response, conn)
+
 		} else {
 			_, err := conn.Write([]byte(defaultResponse))
 
