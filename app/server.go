@@ -20,13 +20,6 @@ func ParseRequest(request string) (string, string, string) {
 	return method, path, version
 }
 
-func ParsePathForEcho(path string) (bool, string, string) {
-
-	basePath, stringAfterEcho, echoPresent := strings.Cut(path, "echo/")
-
-	return echoPresent, stringAfterEcho, basePath
-}
-
 func setResponse(statusCode string, statusMessage string, contentType string, contentLength string, responseBody string) string {
 	response := "HTTP/1.1 " + statusCode + " " + statusMessage + "\r\n"
 	response += "Content-type: " + contentType + "\r\n"
@@ -34,6 +27,16 @@ func setResponse(statusCode string, statusMessage string, contentType string, co
 	response += responseBody + "\r\n"
 
 	return response
+}
+
+func sendResponse(response string, conn net.Conn) {
+	bytesSent, err := conn.Write([]byte(response))
+
+	if err != nil {
+		fmt.Println("Error sending response: ", err.Error())
+		os.Exit(1)
+	}
+	fmt.Printf("Sent %d bytes to client (expected: %d)\n", bytesSent, len(response))
 }
 
 func main() {
@@ -46,17 +49,27 @@ func main() {
 		fmt.Println("Failed to bind to port 4221")
 		os.Exit(1)
 	}
+	defer listner.Close()
 
-	conn, err := listner.Accept()
+	for {
 
-	if err != nil {
-		fmt.Println("Error accepting connection: ", err.Error())
-		os.Exit(1)
+		conn, err := listner.Accept()
+
+		if err != nil {
+			fmt.Println("Error accepting connection: ", err.Error())
+			os.Exit(1)
+		}
+
+		fmt.Println("Client connected: ", conn.RemoteAddr())
+
+		go handleConnection(conn)
 	}
 
-	defer conn.Close()
+}
 
-	fmt.Println("Client connected")
+func handleConnection(conn net.Conn) {
+
+	defer conn.Close()
 
 	//reading incomig requests
 	readBuffer := make([]byte, 2048)
@@ -80,8 +93,6 @@ func main() {
 
 	if method == "GET" {
 
-		echoPresent, stringAfterEcho, _ := ParsePathForEcho(path)
-
 		if path == "/" {
 			_, err := conn.Write([]byte(httpResponse))
 
@@ -89,19 +100,14 @@ func main() {
 				fmt.Println("Error sending response: ", err.Error())
 				os.Exit(1)
 			}
-		} else if echoPresent {
+		} else if strings.HasPrefix(path, "/echo") {
 
+			stringAfterEcho := strings.TrimLeft(path, "/echo/")
 			contentLength := strconv.Itoa(len(stringAfterEcho))
 
 			response := setResponse("200", "OK", "text/plain", contentLength, stringAfterEcho)
 
-			bytesSent, err := conn.Write([]byte(response))
-
-			if err != nil {
-				fmt.Println("Error sending response: ", err.Error())
-				os.Exit(1)
-			}
-			fmt.Printf("Sent %d bytes to client (expected: %d)\n", bytesSent, len(response))
+			sendResponse(response, conn)
 		} else if path == "/user-agent" {
 
 			requestHeader := strings.Split(request, "\r\n")[2]
@@ -110,13 +116,7 @@ func main() {
 
 				requestBody := requestHeader[12:]
 				response := setResponse("200", "OK", "text/plain", strconv.Itoa(len(requestBody)), requestBody)
-				bytesSent, err := conn.Write([]byte(response))
-
-				if err != nil {
-					fmt.Println("Error sending response: ", err.Error())
-					os.Exit(1)
-				}
-				fmt.Printf("Sent %d bytes to client (expected: %d)\n", bytesSent, len(response))
+				sendResponse(response, conn)
 			}
 		} else {
 			_, err := conn.Write([]byte(defaultResponse))
